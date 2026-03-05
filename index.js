@@ -7,6 +7,7 @@ const messageRoutes = require("./routes/message");
 const mediaRoutes = require("./routes/media");
 const cors = require("cors");
 const bodyParser = require("body-parser");
+const { lightQueue } = require("./middleware/requestQueue");
 
 app.use(
   cors({
@@ -17,13 +18,19 @@ app.use(
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
-app.use("/api/messages", messageRoutes);
-app.use("/api/media", mediaRoutes);
+// Apply light queue globally to all message routes
+app.use("/api/messages", lightQueue, messageRoutes);
+app.use("/api/media", mediaRoutes); // media routes manage their own queues
 
 connectDB();
 
 app.get("/", (req, res) => {
   res.send("Hello from Express!");
+});
+
+// Health check — no queue needed
+app.get("/health", (req, res) => {
+  res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
 app.listen(PORT, () => {
