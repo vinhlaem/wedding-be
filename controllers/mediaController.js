@@ -5,14 +5,34 @@ const {
 } = require("../services/cloudinaryService");
 const { importFromGoogleDrive } = require("../services/googleDriveService");
 
-// ─── GET /api/media?component=banner&role=wife ───────────────────────────────
+// Only return fields the client actually needs — omit __v and large unused fields.
+const MEDIA_PROJECTION = {
+  imageUrl: 1,
+  cloudinaryPublicId: 1,
+  order: 1,
+  role: 1,
+  mediaType: 1,
+  component: 1,
+  source: 1,
+  createdAt: 1,
+};
+
+// ─── GET /api/media?component=banner&role=wife ───────────────────────────────────────────────────────
 const getMedia = async (req, res) => {
   try {
     const { component, role } = req.query;
     const filter = {};
     if (component) filter.component = component;
     if (role) filter.role = role;
-    const media = await Media.find(filter).sort({ order: 1, createdAt: -1 });
+
+    // lean() returns plain JS objects (no Mongoose overhead) — faster + less RAM.
+    const media = await Media.find(filter, MEDIA_PROJECTION)
+      .sort({ order: 1, createdAt: -1 })
+      .lean();
+
+    // Public media is immutable until an admin changes it.
+    // Cache at CDN/browser for 60 s, serve stale for up to 5 min while revalidating.
+    res.set("Cache-Control", "public, max-age=60, stale-while-revalidate=300");
     res.status(200).json({ success: true, data: media });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -178,16 +198,21 @@ const importFromDrive = async (req, res) => {
 const reorderMedia = async (req, res) => {
   try {
     const { items } = req.body;
-    if (!Array.isArray(items)) {
+    if (!Array.isArray(items) || items.length === 0) {
       return res
         .status(400)
-        .json({ success: false, message: "items must be an array" });
+        .json({ success: false, message: "items must be a non-empty array" });
     }
 
-    const ops = items.map(({ id, order }) =>
-      Media.findByIdAndUpdate(id, { order }, { new: true }),
-    );
-    await Promise.all(ops);
+    // Use a single bulkWrite instead of N individual findByIdAndUpdate calls.
+    // This sends one round-trip to MongoDB regardless of how many items there are.
+    const ops = items.map(({ id, order }) => ({
+      updateOne: {
+        filter: { _id: id },
+        update: { $set: { order: Number(order) } },
+      },
+    }));
+    await Media.bulkWrite(ops, { ordered: false }); // ordered:false = max parallelism inside Mongo
 
     res.status(200).json({ success: true, message: "Order updated" });
   } catch (error) {
