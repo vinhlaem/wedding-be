@@ -5,6 +5,7 @@ const app = express();
 const PORT = process.env.PORT || 9000;
 const messageRoutes = require("./routes/message");
 const mediaRoutes = require("./routes/media");
+const accountRoutes = require("./routes/account");
 const cors = require("cors");
 const bodyParser = require("body-parser");
 const { lightQueue } = require("./middleware/requestQueue");
@@ -39,6 +40,9 @@ app.use("/api/messages", writeLimiter, lightQueue, messageRoutes);
 
 // apiLimiter is more generous (120/min) for read-heavy media endpoints.
 app.use("/api/media", apiLimiter, mediaRoutes);
+
+// Accounts (bank/QR/crypto) - reads are rate-limited by apiLimiter, writes by writeLimiter inside the route
+app.use("/api/accounts", apiLimiter, accountRoutes);
 
 // ── Misc ──────────────────────────────────────────────────────────────────────
 app.get("/", (req, res) => {
