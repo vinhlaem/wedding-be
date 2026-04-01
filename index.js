@@ -6,6 +6,7 @@ const PORT = process.env.PORT || 9000;
 const messageRoutes = require("./routes/message");
 const mediaRoutes = require("./routes/media");
 const accountRoutes = require("./routes/account");
+const authRoutes = require("./routes/auth");
 const cors = require("cors");
 const bodyParser = require("body-parser");
 const { lightQueue } = require("./middleware/requestQueue");
@@ -35,13 +36,17 @@ app.use(async (req, res, next) => {
 });
 
 // ── Routes ────────────────────────────────────────────────────────────────────
+// Auth — no rate limiter to keep login fast; Google already rate-limits token issuance.
+app.use("/api/auth", authRoutes);
+
 // writeLimiter is tighter (10/min) for the POST /messages write path.
 app.use("/api/messages", writeLimiter, lightQueue, messageRoutes);
 
 // apiLimiter is more generous (120/min) for read-heavy media endpoints.
+// Dashboard write operations (POST/PUT/DELETE) additionally require a valid JWT.
 app.use("/api/media", apiLimiter, mediaRoutes);
 
-// Accounts (bank/QR/crypto) - reads are rate-limited by apiLimiter, writes by writeLimiter inside the route
+// Accounts (bank/QR/crypto) - reads are rate-limited by apiLimiter, writes by writeLimiter + JWT
 app.use("/api/accounts", apiLimiter, accountRoutes);
 
 // ── Misc ──────────────────────────────────────────────────────────────────────

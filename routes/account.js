@@ -7,17 +7,18 @@ const {
   deleteAccount,
 } = require("../controllers/accountController");
 const { writeLimiter } = require("../middleware/rateLimiter");
+const { verifyJWT } = require("../middleware/authMiddleware");
 
 // GET /api/accounts
 router.get("/", getAccounts);
 
-// POST /api/accounts  (creation) - protect with write limiter
-router.post("/", writeLimiter, createAccount);
+// POST /api/accounts  (creation) - protect with write limiter + JWT
+router.post("/", verifyJWT, writeLimiter, createAccount);
 
-// PUT /api/accounts/:id (update) - protect with write limiter
-router.put("/:id", writeLimiter, updateAccount);
+// PUT /api/accounts/:id (update) - protect with write limiter + JWT
+router.put("/:id", verifyJWT, writeLimiter, updateAccount);
 
-// DELETE /api/accounts/:id (delete) - protect with write limiter
-router.delete("/:id", writeLimiter, deleteAccount);
+// DELETE /api/accounts/:id (delete) - protect with write limiter + JWT
+router.delete("/:id", verifyJWT, writeLimiter, deleteAccount);
 
 module.exports = router;

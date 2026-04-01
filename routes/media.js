@@ -11,6 +11,7 @@ const {
   reorderMedia,
 } = require("../controllers/mediaController");
 const { lightQueue, heavyQueue } = require("../middleware/requestQueue");
+const { verifyJWT } = require("../middleware/authMiddleware");
 
 // Use memory storage so we can pipe the buffer to Cloudinary directly
 const upload = multer({
@@ -29,13 +30,19 @@ const upload = multer({
 
 // Light operations — moderate concurrency
 router.get("/", lightQueue, getMedia);
-router.post("/", lightQueue, createMedia);
-router.put("/:id", lightQueue, updateMedia);
-router.delete("/:id", lightQueue, deleteMedia);
-router.patch("/reorder", lightQueue, reorderMedia);
+router.post("/", verifyJWT, lightQueue, createMedia);
+router.put("/:id", verifyJWT, lightQueue, updateMedia);
+router.delete("/:id", verifyJWT, lightQueue, deleteMedia);
+router.patch("/reorder", verifyJWT, lightQueue, reorderMedia);
 
 // Heavy operations — sequential (concurrency=1) to protect weak host
-router.post("/upload", heavyQueue, upload.single("file"), uploadMedia);
-router.post("/import-drive", heavyQueue, importFromDrive);
+router.post(
+  "/upload",
+  verifyJWT,
+  heavyQueue,
+  upload.single("file"),
+  uploadMedia,
+);
+router.post("/import-drive", verifyJWT, heavyQueue, importFromDrive);
 
 module.exports = router;
