@@ -17,7 +17,7 @@ const importFromGoogleDrive = async (
 ) => {
   // 1. Download the file from Google Drive using the user's access token
   const response = await axios.get(
-    `https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media`,
+    `https://www.googleapis.com/drive/v3/files/${driveFileId}?fields=size,mimeType,videoMediaMetadata&supportsAllDrives=true`,
     {
       headers: {
         Authorization: `Bearer ${accessToken}`,
