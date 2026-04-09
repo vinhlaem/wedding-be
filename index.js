@@ -7,7 +7,10 @@ const messageRoutes = require("./routes/message");
 const mediaRoutes = require("./routes/media");
 const accountRoutes = require("./routes/account");
 const authRoutes = require("./routes/auth");
-const budgetRoutes = require("./routes/budget");
+const budgetRoutes       = require("./routes/budget");
+const pushRoutes         = require("./routes/push");
+const notificationRoutes = require("./routes/notification");
+const { startCron }      = require("./services/cronService");
 const { seedBudgets } = require("./scripts/seedBudget");
 const cors = require("cors");
 const bodyParser = require("body-parser");
@@ -57,6 +60,15 @@ app.use("/api/accounts", apiLimiter, accountRoutes);
 
 // Budget (wedding expense management)
 app.use("/api/budgets", apiLimiter, budgetRoutes);
+
+// Push subscriptions
+app.use("/api/push", pushRoutes);
+
+// In-app notifications
+app.use("/api/notifications", notificationRoutes);
+
+// ── Start cron jobs after DB is ready ─────────────────────────────────────────
+dbReady.then(() => startCron());
 
 // ── Misc ──────────────────────────────────────────────────────────────────────
 app.get("/", (req, res) => {

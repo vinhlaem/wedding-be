@@ -50,6 +50,25 @@ const budgetSchema = new mongoose.Schema(
       enum: VALID_STATUSES,
       default: "chua-coc",
     },
+    vendorName: {
+      type: String,
+      default: "",
+      maxlength: 200,
+    },
+    deadline: {
+      type: Date,
+      default: null,
+    },
+    notifyStage: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 4,
+    },
+    lastNotificationSent: {
+      type: Date,
+      default: null,
+    },
   },
   { timestamps: true },
 );

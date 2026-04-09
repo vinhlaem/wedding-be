@@ -13,6 +13,10 @@ const BUDGET_PROJECTION = {
   phone: 1,
   note: 1,
   status: 1,
+  vendorName: 1,
+  deadline: 1,
+  notifyStage: 1,
+  lastNotificationSent: 1,
   createdAt: 1,
   updatedAt: 1,
 };
@@ -45,6 +49,8 @@ const createBudget = async (req, res) => {
       phone,
       note,
       status,
+      vendorName,
+      deadline,
     } = req.body || {};
 
     if (!category || !VALID_CATEGORIES.includes(category)) {
@@ -80,6 +86,8 @@ const createBudget = async (req, res) => {
       phone: phone || "",
       note: note || "",
       status: status && VALID_STATUSES.includes(status) ? status : "chua-coc",
+      vendorName: vendorName || "",
+      deadline: deadline ? new Date(deadline) : null,
     });
 
     res.status(201).json({ success: true, data: budget });
