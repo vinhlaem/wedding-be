@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
 
-const VALID_STATUSES = ["Chưa cọc", "Đã cọc một phần", "Hoàn thành"];
+const VALID_STATUSES = ["chua-coc", "da-coc-mot-phan", "hoan-thanh"];
 const VALID_CATEGORIES = ["dam-hoi", "dam-cuoi"];
 
 const budgetSchema = new mongoose.Schema(
@@ -10,7 +10,7 @@ const budgetSchema = new mongoose.Schema(
       required: true,
       enum: VALID_CATEGORIES,
     },
-    name: {
+    itemName: {
       type: String,
       required: true,
       maxlength: 200,
@@ -20,7 +20,12 @@ const budgetSchema = new mongoose.Schema(
       required: true,
       min: 0,
     },
-    deposit: {
+    depositPaid: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    remainingCost: {
       type: Number,
       default: 0,
       min: 0,
@@ -43,7 +48,7 @@ const budgetSchema = new mongoose.Schema(
     status: {
       type: String,
       enum: VALID_STATUSES,
-      default: "Chưa cọc",
+      default: "chua-coc",
     },
   },
   { timestamps: true },
