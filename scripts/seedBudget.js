@@ -200,11 +200,15 @@ const seedBudgets = async () => {
   try {
     const count = await Budget.countDocuments();
     if (count > 0) {
-      console.log(`[seed] Budget collection already has ${count} items — skipping seed.`);
+      console.log(
+        `[seed] Budget collection already has ${count} items — skipping seed.`,
+      );
       return;
     }
     await Budget.insertMany(DEFAULT_BUDGETS);
-    console.log(`[seed] Inserted ${DEFAULT_BUDGETS.length} default budget items.`);
+    console.log(
+      `[seed] Inserted ${DEFAULT_BUDGETS.length} default budget items.`,
+    );
   } catch (err) {
     console.error("[seed] Budget seed failed:", err.message);
   }
