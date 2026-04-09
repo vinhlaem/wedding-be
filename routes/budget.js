@@ -13,12 +13,12 @@ const { verifyJWT } = require("../middleware/authMiddleware");
 router.get("/", getBudgets);
 
 // POST /api/budgets
-router.post("/", verifyJWT, writeLimiter, createBudget);
+router.post("/", writeLimiter, createBudget);
 
 // PUT /api/budgets/:id
-router.put("/:id", verifyJWT, writeLimiter, updateBudget);
+router.put("/:id", writeLimiter, updateBudget);
 
 // DELETE /api/budgets/:id
-router.delete("/:id", verifyJWT, writeLimiter, deleteBudget);
+router.delete("/:id", writeLimiter, deleteBudget);
 
 module.exports = router;
