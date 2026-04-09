@@ -1,8 +1,8 @@
 const webpush = require("web-push");
 
-const VAPID_PUBLIC_KEY  = process.env.VAPID_PUBLIC_KEY;
+const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY;
 const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
-const VAPID_SUBJECT     = process.env.VAPID_SUBJECT || "mailto:admin@wedding.local";
+const VAPID_SUBJECT = process.env.VAPID_SUBJECT || "mailto:admin@wedding.local";
 
 if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
   console.warn("[push] VAPID keys not set — push notifications disabled.");
@@ -20,7 +20,10 @@ async function sendPush(subscription, payload) {
     await webpush.sendNotification(
       {
         endpoint: subscription.endpoint,
-        keys: { p256dh: subscription.keys.p256dh, auth: subscription.keys.auth },
+        keys: {
+          p256dh: subscription.keys.p256dh,
+          auth: subscription.keys.auth,
+        },
       },
       JSON.stringify(payload),
     );

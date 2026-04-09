@@ -1,5 +1,5 @@
-const express      = require("express");
-const router       = express.Router();
+const express = require("express");
+const router = express.Router();
 const Notification = require("../models/Notification");
 const { apiLimiter } = require("../middleware/rateLimiter");
 const { runNotificationCheck } = require("../services/notificationService");
