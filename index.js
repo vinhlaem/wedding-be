@@ -7,6 +7,7 @@ const messageRoutes = require("./routes/message");
 const mediaRoutes = require("./routes/media");
 const accountRoutes = require("./routes/account");
 const authRoutes = require("./routes/auth");
+const budgetRoutes = require("./routes/budget");
 const cors = require("cors");
 const bodyParser = require("body-parser");
 const { lightQueue } = require("./middleware/requestQueue");
@@ -48,6 +49,9 @@ app.use("/api/media", apiLimiter, mediaRoutes);
 
 // Accounts (bank/QR/crypto) - reads are rate-limited by apiLimiter, writes by writeLimiter + JWT
 app.use("/api/accounts", apiLimiter, accountRoutes);
+
+// Budget (wedding expense management)
+app.use("/api/budgets", apiLimiter, budgetRoutes);
 
 // ── Misc ──────────────────────────────────────────────────────────────────────
 app.get("/", (req, res) => {
