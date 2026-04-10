@@ -9,7 +9,7 @@ const { runNotificationCheck } = require("./notificationService");
 //
 // Schedule reference (UTC):
 //   Testing    : every-5-min  →  "*/5 * * * *"
-//   Production : 08:00 ICT    →  "0 1 * * *"  (01:00 UTC)
+//   Production : 08:00 ICT    →  "0 1 * * *"  (01:00 UTC) ← current
 function startCron() {
   if (process.env.VERCEL) {
     // Running on Vercel — cron is handled externally; nothing to do here.
@@ -19,7 +19,7 @@ function startCron() {
 
   // Local / self-hosted: fall back to a simple setInterval so node-cron is
   // not required as a production dependency.
-  const INTERVAL_MS = 5 * 60 * 1_000; // 5 minutes (matches Vercel schedule)
+  const INTERVAL_MS = 24 * 60 * 60 * 1_000; // 24 hours
   setInterval(async () => {
     console.log(`[cron] Running at: ${new Date().toISOString()}`);
     try {
@@ -30,7 +30,7 @@ function startCron() {
     }
   }, INTERVAL_MS);
 
-  console.log("[cron] Deadline notification job scheduled (every 5 min).");
+  console.log("[cron] Deadline notification job scheduled (every 24 hours).");
 }
 
 module.exports = { startCron };

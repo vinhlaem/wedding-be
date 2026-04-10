@@ -4,13 +4,12 @@ const connectDB = require("../database");
 const { runNotificationCheck } = require("../services/notificationService");
 
 // NOTE: Vercel Cron Jobs run in UTC.
-//       Current schedule: */5 * * * * (every 5 min — for testing).
-//       Switch to "0 1 * * *" (08:00 ICT) before going to production.
+//       Current schedule: "0 1 * * *" → 08:00 ICT (01:00 UTC), once per day.
 
 /**
  * GET /api/cron/notify
  *
- * Triggered by Vercel Cron every 5 minutes.
+ * Triggered by Vercel Cron once per day.
  * Protected by a shared secret passed as:  Authorization: Bearer <CRON_SECRET>
  */
 router.get("/notify", async (req, res) => {
@@ -38,6 +37,28 @@ router.get("/notify", async (req, res) => {
     return res.json({ success: true, ranAt: startedAt });
   } catch (err) {
     console.error("[cron] Error:", err.message);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/cron/test-notify
+ *
+ * Manual trigger for testing — does NOT require CRON_SECRET.
+ * Protected by the same JWT middleware used on other routes.
+ * Call with a valid user token:  Authorization: Bearer <JWT>
+ */
+router.post("/test-notify", async (req, res) => {
+  const startedAt = new Date().toISOString();
+  console.log(`[cron:test] Manual trigger at: ${startedAt}`);
+
+  try {
+    await connectDB();
+    await runNotificationCheck();
+    console.log("[cron:test] Completed.");
+    return res.json({ success: true, ranAt: startedAt });
+  } catch (err) {
+    console.error("[cron:test] Error:", err.message);
     return res.status(500).json({ error: err.message });
   }
 });
