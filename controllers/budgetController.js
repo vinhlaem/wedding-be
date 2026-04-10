@@ -9,11 +9,9 @@ const BUDGET_PROJECTION = {
   estimatedCost: 1,
   depositPaid: 1,
   remainingCost: 1,
-  address: 1,
-  phone: 1,
   note: 1,
   status: 1,
-  vendorName: 1,
+  vendors: 1,
   deadline: 1,
   notifyStage: 1,
   lastNotificationSent: 1,
@@ -45,11 +43,8 @@ const createBudget = async (req, res) => {
       itemName,
       estimatedCost,
       depositPaid,
-      address,
-      phone,
       note,
       status,
-      vendorName,
       deadline,
     } = req.body || {};
 
@@ -82,12 +77,10 @@ const createBudget = async (req, res) => {
       estimatedCost: estNum,
       depositPaid: depNum,
       remainingCost: estNum - depNum,
-      address: address || "",
-      phone: phone || "",
       note: note || "",
       status: status && VALID_STATUSES.includes(status) ? status : "chua-coc",
-      vendorName: vendorName || "",
       deadline: deadline ? new Date(deadline) : null,
+      vendors: [],
     });
 
     res.status(201).json({ success: true, data: budget });
@@ -100,6 +93,9 @@ const updateBudget = async (req, res) => {
   try {
     const { id } = req.params;
     const payload = req.body || {};
+
+    // Strip vendor management — use dedicated vendor endpoints
+    delete payload.vendors;
 
     if (payload.estimatedCost != null) {
       payload.estimatedCost = Number(payload.estimatedCost);
@@ -126,7 +122,6 @@ const updateBudget = async (req, res) => {
         .json({ success: false, message: "Invalid status" });
     }
 
-    // Re-compute remainingCost if either cost field changed
     const existing = await Budget.findById(id).lean();
     if (!existing) {
       return res
@@ -168,9 +163,158 @@ const deleteBudget = async (req, res) => {
   }
 };
 
+// ── Vendor sub-document controllers ─────────────────────────────────────────
+
+const addVendor = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, address, phone, price } = req.body || {};
+
+    if (!name || typeof name !== "string" || name.trim().length === 0) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Vendor name is required" });
+    }
+    if (price == null || Number(price) < 0) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid vendor price" });
+    }
+
+    const budget = await Budget.findById(id);
+    if (!budget) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Budget item not found" });
+    }
+
+    const isFirst = budget.vendors.length === 0;
+    budget.vendors.push({
+      name: name.trim(),
+      address: address || "",
+      phone: phone || "",
+      price: Number(price),
+      isDefault: isFirst, // first vendor auto becomes default
+    });
+    await budget.save();
+
+    res.status(201).json({ success: true, data: budget });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+const updateVendor = async (req, res) => {
+  try {
+    const { id, vendorId } = req.params;
+    const { name, address, phone, price } = req.body || {};
+
+    const budget = await Budget.findById(id);
+    if (!budget) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Budget item not found" });
+    }
+
+    const vendor = budget.vendors.id(vendorId);
+    if (!vendor) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Vendor not found" });
+    }
+
+    if (name != null) vendor.name = String(name).trim();
+    if (address != null) vendor.address = String(address);
+    if (phone != null) vendor.phone = String(phone);
+    if (price != null) {
+      const p = Number(price);
+      if (p < 0) {
+        return res
+          .status(400)
+          .json({ success: false, message: "Invalid vendor price" });
+      }
+      vendor.price = p;
+    }
+
+    await budget.save();
+    res.status(200).json({ success: true, data: budget });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+const deleteVendor = async (req, res) => {
+  try {
+    const { id, vendorId } = req.params;
+
+    const budget = await Budget.findById(id);
+    if (!budget) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Budget item not found" });
+    }
+
+    const vendor = budget.vendors.id(vendorId);
+    if (!vendor) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Vendor not found" });
+    }
+
+    const wasDefault = vendor.isDefault;
+    vendor.deleteOne();
+
+    // If deleted vendor was default, assign default to the cheapest remaining
+    if (wasDefault && budget.vendors.length > 0) {
+      const cheapest = budget.vendors.reduce((a, b) =>
+        a.price <= b.price ? a : b,
+      );
+      cheapest.isDefault = true;
+    }
+
+    await budget.save();
+    res.status(200).json({ success: true, data: budget });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+const setDefaultVendor = async (req, res) => {
+  try {
+    const { id, vendorId } = req.params;
+
+    const budget = await Budget.findById(id);
+    if (!budget) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Budget item not found" });
+    }
+
+    const vendor = budget.vendors.id(vendorId);
+    if (!vendor) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Vendor not found" });
+    }
+
+    budget.vendors.forEach((v) => {
+      v.isDefault = v._id.toString() === vendorId;
+    });
+
+    await budget.save();
+    res.status(200).json({ success: true, data: budget });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 module.exports = {
   getBudgets,
   createBudget,
   updateBudget,
   deleteBudget,
+  addVendor,
+  updateVendor,
+  deleteVendor,
+  setDefaultVendor,
 };

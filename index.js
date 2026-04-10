@@ -11,6 +11,7 @@ const budgetRoutes = require("./routes/budget");
 const pushRoutes = require("./routes/push");
 const notificationRoutes = require("./routes/notification");
 const cronRoutes = require("./routes/cron");
+const adminRoutes = require("./routes/admin");
 const { startCron } = require("./services/cronService");
 const { seedBudgets } = require("./scripts/seedBudget");
 const cors = require("cors");
@@ -70,6 +71,9 @@ app.use("/api/notifications", notificationRoutes);
 
 // Vercel Cron trigger — protected by CRON_SECRET
 app.use("/api/cron", cronRoutes);
+
+// One-time admin tasks — protected by ADMIN_SECRET (remove after use)
+app.use("/api/admin", adminRoutes);
 
 // ── Start cron jobs after DB is ready ─────────────────────────────────────────
 dbReady.then(() => startCron());

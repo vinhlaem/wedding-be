@@ -3,6 +3,17 @@ const mongoose = require("mongoose");
 const VALID_STATUSES = ["chua-coc", "da-coc-mot-phan", "hoan-thanh"];
 const VALID_CATEGORIES = ["dam-hoi", "dam-cuoi"];
 
+const vendorSchema = new mongoose.Schema(
+  {
+    name: { type: String, required: true, maxlength: 200 },
+    address: { type: String, default: "", maxlength: 500 },
+    phone: { type: String, default: "", maxlength: 20 },
+    price: { type: Number, required: true, min: 0 },
+    isDefault: { type: Boolean, default: false },
+  },
+  { _id: true },
+);
+
 const budgetSchema = new mongoose.Schema(
   {
     category: {
@@ -30,16 +41,6 @@ const budgetSchema = new mongoose.Schema(
       default: 0,
       min: 0,
     },
-    address: {
-      type: String,
-      default: "",
-      maxlength: 500,
-    },
-    phone: {
-      type: String,
-      default: "",
-      maxlength: 20,
-    },
     note: {
       type: String,
       default: "",
@@ -50,14 +51,13 @@ const budgetSchema = new mongoose.Schema(
       enum: VALID_STATUSES,
       default: "chua-coc",
     },
-    vendorName: {
-      type: String,
-      default: "",
-      maxlength: 200,
-    },
     deadline: {
       type: Date,
       default: null,
+    },
+    vendors: {
+      type: [vendorSchema],
+      default: [],
     },
     notifyStage: {
       type: Number,
