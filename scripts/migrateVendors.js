@@ -113,6 +113,7 @@ async function migrate() {
 
     const update = {
       $unset: { vendorName: "", address: "", phone: "" },
+      $set: { baseEstimatedCost: doc.estimatedCost ?? 0 },
     };
 
     if (hasAnyInfo) {

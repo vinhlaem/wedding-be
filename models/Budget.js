@@ -31,6 +31,11 @@ const budgetSchema = new mongoose.Schema(
       required: true,
       min: 0,
     },
+    baseEstimatedCost: {
+      type: Number,
+      default: null, // original user-set estimate; restored when all vendors removed
+      min: 0,
+    },
     depositPaid: {
       type: Number,
       default: 0,

@@ -3,6 +3,28 @@ const Budget = require("../models/Budget");
 const VALID_CATEGORIES = ["dam-hoi", "dam-cuoi"];
 const VALID_STATUSES = ["chua-coc", "da-coc-mot-phan", "hoan-thanh"];
 
+/**
+ * Sync estimatedCost from the default vendor price.
+ * Falls back to baseEstimatedCost when no vendors remain.
+ */
+function syncEstimatedCost(budget) {
+  const vendors = budget.vendors || [];
+  if (vendors.length > 0) {
+    const def = vendors.find((v) => v.isDefault);
+    const source = def || vendors.reduce((a, b) => (a.price <= b.price ? a : b));
+    budget.estimatedCost = source.price;
+  } else {
+    // Revert to the original user-set estimate
+    if (budget.baseEstimatedCost != null) {
+      budget.estimatedCost = budget.baseEstimatedCost;
+    }
+  }
+  budget.remainingCost = Math.max(
+    0,
+    budget.estimatedCost - (budget.depositPaid || 0),
+  );
+}
+
 const BUDGET_PROJECTION = {
   category: 1,
   itemName: 1,
@@ -75,6 +97,7 @@ const createBudget = async (req, res) => {
       category,
       itemName: itemName.trim(),
       estimatedCost: estNum,
+      baseEstimatedCost: estNum,
       depositPaid: depNum,
       remainingCost: estNum - depNum,
       note: note || "",
@@ -128,13 +151,25 @@ const updateBudget = async (req, res) => {
         .status(404)
         .json({ success: false, message: "Budget item not found" });
     }
+
+    const hasVendors = Array.isArray(existing.vendors) && existing.vendors.length > 0;
+
+    if (payload.estimatedCost != null) {
+      // Always update the base (original) estimate regardless of vendors
+      payload.baseEstimatedCost = payload.estimatedCost;
+      // When vendors exist, estimatedCost is controlled by the default vendor — ignore manual input
+      if (hasVendors) {
+        delete payload.estimatedCost;
+      }
+    }
+
     const estNum =
       payload.estimatedCost != null
         ? payload.estimatedCost
         : existing.estimatedCost;
     const depNum =
       payload.depositPaid != null ? payload.depositPaid : existing.depositPaid;
-    payload.remainingCost = estNum - depNum;
+    payload.remainingCost = Math.max(0, estNum - depNum);
 
     const budget = await Budget.findByIdAndUpdate(id, payload, {
       new: true,
@@ -196,6 +231,7 @@ const addVendor = async (req, res) => {
       price: Number(price),
       isDefault: isFirst, // first vendor auto becomes default
     });
+    syncEstimatedCost(budget);
     await budget.save();
 
     res.status(201).json({ success: true, data: budget });
@@ -236,6 +272,7 @@ const updateVendor = async (req, res) => {
       vendor.price = p;
     }
 
+    syncEstimatedCost(budget);
     await budget.save();
     res.status(200).json({ success: true, data: budget });
   } catch (error) {
@@ -272,6 +309,7 @@ const deleteVendor = async (req, res) => {
       cheapest.isDefault = true;
     }
 
+    syncEstimatedCost(budget);
     await budget.save();
     res.status(200).json({ success: true, data: budget });
   } catch (error) {
@@ -301,6 +339,7 @@ const setDefaultVendor = async (req, res) => {
       v.isDefault = v._id.toString() === vendorId;
     });
 
+    syncEstimatedCost(budget);
     await budget.save();
     res.status(200).json({ success: true, data: budget });
   } catch (error) {

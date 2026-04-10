@@ -69,6 +69,7 @@ router.post("/migrate-vendors", async (req, res) => {
 
       const update = {
         $unset: { vendorName: "", address: "", phone: "" },
+        $set: { baseEstimatedCost: doc.estimatedCost ?? 0 },
       };
 
       if (hasAnyInfo) {
