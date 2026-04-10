@@ -174,3 +174,27 @@ const DEFAULT_BUDGETS = [
     vendors: [],
   },
 ];
+
+/**
+ * Idempotent seed: inserts defaults only if the collection is empty.
+ * Safe to call on every startup.
+ */
+const seedBudgets = async () => {
+  try {
+    const count = await Budget.countDocuments();
+    if (count > 0) {
+      console.log(
+        `[seed] Budget collection already has ${count} items — skipping seed.`,
+      );
+      return;
+    }
+    await Budget.insertMany(DEFAULT_BUDGETS);
+    console.log(
+      `[seed] Inserted ${DEFAULT_BUDGETS.length} default budget items.`,
+    );
+  } catch (err) {
+    console.error("[seed] Budget seed failed:", err.message);
+  }
+};
+
+module.exports = { seedBudgets };
