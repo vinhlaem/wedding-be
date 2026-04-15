@@ -323,7 +323,8 @@ const updateVendor = async (req, res) => {
     }
 
     const requester = req.user || {};
-    const isOwnerUpd = budget.owner && budget.owner.toString() === requester.sub;
+    const isOwnerUpd =
+      budget.owner && budget.owner.toString() === requester.sub;
     const ownerUserUpd = budget.owner
       ? await User.findById(budget.owner, { sharedWith: 1 }).lean()
       : null;
@@ -421,7 +422,8 @@ const setDefaultVendor = async (req, res) => {
     }
     // Authorization: owner or workspace collaborator
     const requester = req.user || {};
-    const isOwnerDef = budget.owner && budget.owner.toString() === requester.sub;
+    const isOwnerDef =
+      budget.owner && budget.owner.toString() === requester.sub;
     const ownerUserDef = budget.owner
       ? await User.findById(budget.owner, { sharedWith: 1 }).lean()
       : null;
@@ -464,7 +466,9 @@ const createShareLink = async (req, res) => {
   try {
     const requester = req.user || {};
     if (!requester.sub)
-      return res.status(401).json({ success: false, message: "Authentication required" });
+      return res
+        .status(401)
+        .json({ success: false, message: "Authentication required" });
 
     const secret = process.env.SHARE_SECRET || process.env.JWT_SECRET;
     if (!secret)
@@ -478,7 +482,7 @@ const createShareLink = async (req, res) => {
     };
 
     const token = jwt.sign(payload, secret, { expiresIn: "7d" });
-    const frontend = process.env.FRONTEND_URL || "http://localhost:3000";
+    const frontend = process.env.FRONTEND_URL_BUDGET || "http://localhost:3000";
     const link = `${frontend.replace(/\/$/, "")}?shareToken=${token}`;
 
     return res.status(200).json({ success: true, link, token });
