@@ -1,4 +1,5 @@
 const Budget = require("../models/Budget");
+const User = require("../models/User");
 
 const VALID_CATEGORIES = ["dam-hoi", "dam-cuoi"];
 const VALID_STATUSES = ["chua-coc", "da-coc-mot-phan", "hoan-thanh"];
@@ -42,6 +43,19 @@ const BUDGET_PROJECTION = {
   updatedAt: 1,
 };
 
+/**
+ * Returns all owners whose workspace this requester can access:
+ * - their own userId, PLUS
+ * - any User whose sharedWith array contains this requester's id.
+ */
+async function getAccessibleOwnerIds(requesterId) {
+  const sharedOwners = await User.find(
+    { sharedWith: requesterId },
+    { _id: 1 },
+  ).lean();
+  return [requesterId, ...sharedOwners.map((u) => u._id.toString())];
+}
+
 const getBudgets = async (req, res) => {
   try {
     const { category } = req.query;
@@ -49,16 +63,18 @@ const getBudgets = async (req, res) => {
     if (category && VALID_CATEGORIES.includes(category)) {
       filter.category = category;
     }
-    // Scope to owner for non-admin users
+
     const requester = req.user || {};
     if (requester.role !== "admin") {
-      filter.owner = requester.sub;
+      // show own items + items from workspaces shared with me
+      const ownerIds = await getAccessibleOwnerIds(requester.sub);
+      filter.owner = { $in: ownerIds };
     }
 
     const budgets = await Budget.find(filter, BUDGET_PROJECTION)
       .sort({ createdAt: 1 })
       .lean();
-    res.set("Cache-Control", "public, max-age=30, stale-while-revalidate=60");
+    res.set("Cache-Control", "no-store");
     res.status(200).json({ success: true, data: budgets });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -161,14 +177,19 @@ const updateBudget = async (req, res) => {
         .json({ success: false, message: "Budget item not found" });
     }
 
-    // Authorization: non-admins can only edit their own items or if they are collaborator
+    // Authorization: non-admins can edit if they own it or have workspace access
     const requester = req.user || {};
     const isOwner =
       existing.owner && existing.owner.toString() === requester.sub;
-    const isCollaborator =
-      Array.isArray(existing.collaborators) &&
-      existing.collaborators.some((c) => c.toString() === requester.sub);
-    if (requester.role !== "admin" && !isOwner && !isCollaborator) {
+    // check workspace-level share: did the owner share their workspace with requester?
+    const ownerUser = existing.owner
+      ? await User.findById(existing.owner, { sharedWith: 1 }).lean()
+      : null;
+    const isWorkspaceCollaborator =
+      ownerUser &&
+      Array.isArray(ownerUser.sharedWith) &&
+      ownerUser.sharedWith.some((id) => id.toString() === requester.sub);
+    if (requester.role !== "admin" && !isOwner && !isWorkspaceCollaborator) {
       return res.status(403).json({ success: false, message: "Forbidden" });
     }
 
@@ -213,13 +234,17 @@ const deleteBudget = async (req, res) => {
         .json({ success: false, message: "Budget item not found" });
     }
 
-    // Authorization: owner, collaborator, or admin can delete
+    // Authorization: owner or workspace collaborator can delete
     const requester = req.user || {};
     const isOwner = budget.owner && budget.owner.toString() === requester.sub;
-    const isCollaborator =
-      Array.isArray(budget.collaborators) &&
-      budget.collaborators.some((c) => c.toString() === requester.sub);
-    if (requester.role !== "admin" && !isOwner && !isCollaborator) {
+    const ownerUserDel = budget.owner
+      ? await User.findById(budget.owner, { sharedWith: 1 }).lean()
+      : null;
+    const isWorkspaceCollabDel =
+      ownerUserDel &&
+      Array.isArray(ownerUserDel.sharedWith) &&
+      ownerUserDel.sharedWith.some((id) => id.toString() === requester.sub);
+    if (requester.role !== "admin" && !isOwner && !isWorkspaceCollabDel) {
       return res.status(403).json({ success: false, message: "Forbidden" });
     }
     await budget.deleteOne();
@@ -254,13 +279,17 @@ const addVendor = async (req, res) => {
         .json({ success: false, message: "Budget item not found" });
     }
 
-    // Authorization for vendors: owner, collaborator, or admin
+    // Authorization for vendors: owner or workspace collaborator
     const requester = req.user || {};
     const isOwner = budget.owner && budget.owner.toString() === requester.sub;
-    const isCollaborator =
-      Array.isArray(budget.collaborators) &&
-      budget.collaborators.some((c) => c.toString() === requester.sub);
-    if (requester.role !== "admin" && !isOwner && !isCollaborator) {
+    const ownerUserAdd = budget.owner
+      ? await User.findById(budget.owner, { sharedWith: 1 }).lean()
+      : null;
+    const isWorkspaceCollabAdd =
+      ownerUserAdd &&
+      Array.isArray(ownerUserAdd.sharedWith) &&
+      ownerUserAdd.sharedWith.some((id) => id.toString() === requester.sub);
+    if (requester.role !== "admin" && !isOwner && !isWorkspaceCollabAdd) {
       return res.status(403).json({ success: false, message: "Forbidden" });
     }
 
@@ -294,11 +323,15 @@ const updateVendor = async (req, res) => {
     }
 
     const requester = req.user || {};
-    const isOwner = budget.owner && budget.owner.toString() === requester.sub;
-    const isCollaborator =
-      Array.isArray(budget.collaborators) &&
-      budget.collaborators.some((c) => c.toString() === requester.sub);
-    if (requester.role !== "admin" && !isOwner && !isCollaborator) {
+    const isOwnerUpd = budget.owner && budget.owner.toString() === requester.sub;
+    const ownerUserUpd = budget.owner
+      ? await User.findById(budget.owner, { sharedWith: 1 }).lean()
+      : null;
+    const isWorkspaceCollabUpd =
+      ownerUserUpd &&
+      Array.isArray(ownerUserUpd.sharedWith) &&
+      ownerUserUpd.sharedWith.some((id) => id.toString() === requester.sub);
+    if (requester.role !== "admin" && !isOwnerUpd && !isWorkspaceCollabUpd) {
       return res.status(403).json({ success: false, message: "Forbidden" });
     }
 
@@ -386,13 +419,17 @@ const setDefaultVendor = async (req, res) => {
         .status(404)
         .json({ success: false, message: "Budget item not found" });
     }
-    // Authorization: owner, collaborator, or admin
+    // Authorization: owner or workspace collaborator
     const requester = req.user || {};
-    const isOwner = budget.owner && budget.owner.toString() === requester.sub;
-    const isCollaborator =
-      Array.isArray(budget.collaborators) &&
-      budget.collaborators.some((c) => c.toString() === requester.sub);
-    if (requester.role !== "admin" && !isOwner && !isCollaborator) {
+    const isOwnerDef = budget.owner && budget.owner.toString() === requester.sub;
+    const ownerUserDef = budget.owner
+      ? await User.findById(budget.owner, { sharedWith: 1 }).lean()
+      : null;
+    const isWorkspaceCollabDef =
+      ownerUserDef &&
+      Array.isArray(ownerUserDef.sharedWith) &&
+      ownerUserDef.sharedWith.some((id) => id.toString() === requester.sub);
+    if (requester.role !== "admin" && !isOwnerDef && !isWorkspaceCollabDef) {
       return res.status(403).json({ success: false, message: "Forbidden" });
     }
 
@@ -415,27 +452,19 @@ const setDefaultVendor = async (req, res) => {
   }
 };
 
-// ---------------- Share endpoints -----------------
+// ---------------- Share endpoints (workspace-level) -----------------
 const jwt = require("jsonwebtoken");
 
 /**
- * POST /api/budgets/:id/share
- * Creates a share token (link) that can be given to another user.
+ * POST /api/budgets/share
+ * Creates a workspace share link for the current user — invitee gets access
+ * to ALL of the owner's budget items.
  */
 const createShareLink = async (req, res) => {
   try {
-    const { id } = req.params;
-    const budget = await Budget.findById(id).lean();
-    if (!budget)
-      return res
-        .status(404)
-        .json({ success: false, message: "Budget not found" });
-
     const requester = req.user || {};
-    const isOwner = budget.owner && budget.owner.toString() === requester.sub;
-    if (requester.role !== "admin" && !isOwner) {
-      return res.status(403).json({ success: false, message: "Forbidden" });
-    }
+    if (!requester.sub)
+      return res.status(401).json({ success: false, message: "Authentication required" });
 
     const secret = process.env.SHARE_SECRET || process.env.JWT_SECRET;
     if (!secret)
@@ -444,14 +473,13 @@ const createShareLink = async (req, res) => {
         .json({ success: false, message: "SHARE_SECRET not configured" });
 
     const payload = {
-      budgetId: id,
-      inviterId: requester.sub,
+      workspaceOwnerId: requester.sub,
       inviterEmail: requester.email,
     };
 
     const token = jwt.sign(payload, secret, { expiresIn: "7d" });
     const frontend = process.env.FRONTEND_URL || "http://localhost:3000";
-    const link = `${frontend.replace(/\/$/, "")}/budget?shareToken=${token}`;
+    const link = `${frontend.replace(/\/$/, "")}?shareToken=${token}`;
 
     return res.status(200).json({ success: true, link, token });
   } catch (err) {
@@ -462,7 +490,7 @@ const createShareLink = async (req, res) => {
 /**
  * POST /api/budgets/share/accept
  * Body: { token }
- * After user logs in, frontend posts token to accept share and add user as collaborator
+ * Adds the requester to the workspace owner's `sharedWith` list.
  */
 const acceptShare = async (req, res) => {
   try {
@@ -484,14 +512,14 @@ const acceptShare = async (req, res) => {
     } catch (err) {
       return res
         .status(400)
-        .json({ success: false, message: "Invalid or expired token" });
+        .json({ success: false, message: "Invalid or expired share token" });
     }
 
-    const budget = await Budget.findById(payload.budgetId);
-    if (!budget)
+    const { workspaceOwnerId } = payload;
+    if (!workspaceOwnerId)
       return res
-        .status(404)
-        .json({ success: false, message: "Budget not found" });
+        .status(400)
+        .json({ success: false, message: "Invalid share token format" });
 
     const requester = req.user || {};
     if (!requester.sub)
@@ -499,19 +527,32 @@ const acceptShare = async (req, res) => {
         .status(401)
         .json({ success: false, message: "Authentication required" });
 
+    // Prevent owner from adding themselves
+    if (requester.sub === workspaceOwnerId)
+      return res
+        .status(400)
+        .json({ success: false, message: "Cannot share with yourself" });
+
+    const owner = await User.findById(workspaceOwnerId);
+    if (!owner)
+      return res
+        .status(404)
+        .json({ success: false, message: "Workspace owner not found" });
+
     const uid = requester.sub;
-    // add to collaborators if not present
-    const exists =
-      Array.isArray(budget.collaborators) &&
-      budget.collaborators.some((c) => c.toString() === uid);
-    if (!exists) {
-      budget.collaborators.push(uid);
-      await budget.save();
+    const alreadyShared =
+      Array.isArray(owner.sharedWith) &&
+      owner.sharedWith.some((id) => id.toString() === uid);
+
+    if (!alreadyShared) {
+      owner.sharedWith.push(uid);
+      await owner.save();
     }
 
-    return res
-      .status(200)
-      .json({ success: true, data: { budgetId: budget._id } });
+    return res.status(200).json({
+      success: true,
+      data: { workspaceOwnerId, inviterEmail: payload.inviterEmail },
+    });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
   }

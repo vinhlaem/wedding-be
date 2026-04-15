@@ -40,8 +40,8 @@ router.patch(
 );
 
 // Share endpoints
-// POST /api/budgets/:id/share  -> create share link (owner/admin)
-router.post("/:id/share", verifyJWT, writeLimiter, createShareLink);
+// POST /api/budgets/share  -> create workspace share link (authenticated user)
+router.post("/share", verifyJWT, writeLimiter, createShareLink);
 
 // POST /api/budgets/share/accept  -> accept share (after login), body: { token }
 router.post("/share/accept", verifyJWT, writeLimiter, acceptShare);

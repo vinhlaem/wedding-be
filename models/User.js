@@ -8,6 +8,11 @@ const userSchema = new mongoose.Schema(
     picture: { type: String },
     // Allow regular users for the wedding-budget flow
     role: { type: String, enum: ["admin", "hr", "user"], default: "user" },
+    // Users who have been granted access to this user's entire budget workspace
+    sharedWith: {
+      type: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+      default: [],
+    },
   },
   { timestamps: true },
 );
