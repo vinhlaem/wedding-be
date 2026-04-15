@@ -48,17 +48,21 @@ router.post("/migrate-vendors", async (req, res) => {
     const log = [];
 
     for (const doc of candidates) {
-      const hasVendors =
-        Array.isArray(doc.vendors) && doc.vendors.length > 0;
+      const hasVendors = Array.isArray(doc.vendors) && doc.vendors.length > 0;
 
       if (hasVendors) {
         // Already has vendors — just remove legacy fields
-        await mongoose.connection.db.collection("budgets").updateOne(
-          { _id: doc._id },
-          { $unset: { vendorName: "", address: "", phone: "" } },
-        );
+        await mongoose.connection.db
+          .collection("budgets")
+          .updateOne(
+            { _id: doc._id },
+            { $unset: { vendorName: "", address: "", phone: "" } },
+          );
         skipped++;
-        log.push({ id: String(doc._id), action: "unset-only (already has vendors)" });
+        log.push({
+          id: String(doc._id),
+          action: "unset-only (already has vendors)",
+        });
         continue;
       }
 
@@ -116,3 +120,39 @@ router.post("/migrate-vendors", async (req, res) => {
 });
 
 module.exports = router;
+
+// POST /api/admin/migrate-assign-budgets
+router.post("/migrate-assign-budgets", async (req, res) => {
+  try {
+    const mongoose = require("mongoose");
+    const User = require("../models/User");
+
+    // Find an existing admin
+    let admin = await User.findOne({ role: "admin" });
+    if (!admin) {
+      // Create placeholder admin; allow passing preferred email in body
+      const email = (req.body && req.body.adminEmail) || "admin@example.com";
+      admin = await User.create({
+        googleId: `migration-admin-${Date.now()}`,
+        email,
+        name: "Admin (migration)",
+        role: "admin",
+      });
+    }
+
+    const result = await mongoose.connection.db
+      .collection("budgets")
+      .updateMany(
+        { owner: { $exists: false } },
+        { $set: { owner: admin._id } },
+      );
+
+    return res.status(200).json({
+      success: true,
+      adminId: admin._id,
+      modifiedCount: result.modifiedCount ?? result.nModified ?? 0,
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});

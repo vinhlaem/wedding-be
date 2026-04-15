@@ -9,25 +9,41 @@ const {
   updateVendor,
   deleteVendor,
   setDefaultVendor,
+  createShareLink,
+  acceptShare,
 } = require("../controllers/budgetController");
+const { verifyJWT } = require("../middleware/authMiddleware");
 const { writeLimiter } = require("../middleware/rateLimiter");
 
+// Protect budget endpoints: users must be authenticated. Admins still can access all.
 // GET /api/budgets?category=dam-hoi|dam-cuoi
-router.get("/", getBudgets);
+router.get("/", verifyJWT, getBudgets);
 
 // POST /api/budgets
-router.post("/", writeLimiter, createBudget);
+router.post("/", verifyJWT, writeLimiter, createBudget);
 
 // PUT /api/budgets/:id
-router.put("/:id", writeLimiter, updateBudget);
+router.put("/:id", verifyJWT, writeLimiter, updateBudget);
 
 // DELETE /api/budgets/:id
-router.delete("/:id", writeLimiter, deleteBudget);
+router.delete("/:id", verifyJWT, writeLimiter, deleteBudget);
 
 // Vendor sub-routes
-router.post("/:id/vendors", writeLimiter, addVendor);
-router.put("/:id/vendors/:vendorId", writeLimiter, updateVendor);
-router.delete("/:id/vendors/:vendorId", writeLimiter, deleteVendor);
-router.patch("/:id/vendors/:vendorId/default", writeLimiter, setDefaultVendor);
+router.post("/:id/vendors", verifyJWT, writeLimiter, addVendor);
+router.put("/:id/vendors/:vendorId", verifyJWT, writeLimiter, updateVendor);
+router.delete("/:id/vendors/:vendorId", verifyJWT, writeLimiter, deleteVendor);
+router.patch(
+  "/:id/vendors/:vendorId/default",
+  verifyJWT,
+  writeLimiter,
+  setDefaultVendor,
+);
+
+// Share endpoints
+// POST /api/budgets/:id/share  -> create share link (owner/admin)
+router.post("/:id/share", verifyJWT, writeLimiter, createShareLink);
+
+// POST /api/budgets/share/accept  -> accept share (after login), body: { token }
+router.post("/share/accept", verifyJWT, writeLimiter, acceptShare);
 
 module.exports = router;

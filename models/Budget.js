@@ -16,6 +16,18 @@ const vendorSchema = new mongoose.Schema(
 
 const budgetSchema = new mongoose.Schema(
   {
+    // Owner of the budget item - per-user isolation
+    owner: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: false,
+      index: true,
+    },
+    // Collaborators who can edit this budget (shared users)
+    collaborators: {
+      type: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+      default: [],
+    },
     category: {
       type: String,
       required: true,

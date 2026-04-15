@@ -46,8 +46,13 @@ const googleLogin = async (req, res) => {
 
   const normalisedEmail = email.trim().toLowerCase();
 
-  // 3. Whitelist check
-  if (!isEmailWhitelisted(normalisedEmail)) {
+  // 3. Decide login flow
+  // Clients can request scope='budget' to allow public sign-in (for wedding-budget page)
+  const scope = (req.body && req.body.scope) || "dashboard";
+  const whitelisted = isEmailWhitelisted(normalisedEmail);
+
+  if (scope !== "budget" && !whitelisted) {
+    // Dashboard-only flow: enforce whitelist
     console.warn("[auth] Unauthorised login attempt:", normalisedEmail);
     return res.status(403).json({
       success: false,
@@ -55,14 +60,17 @@ const googleLogin = async (req, res) => {
     });
   }
 
-  // 4. Find or create user
+  // 4. Find or create user. New accounts created via budget flow get role 'user' unless whitelisted.
   let user;
   try {
+    const roleForCreate = whitelisted ? "admin" : "user";
+    // If dashboard scope and whitelisted, keep admin; if budget scope, allow public user creation
     user = await findOrCreateUser({
       googleId,
       email: normalisedEmail,
       name,
       picture,
+      role: roleForCreate,
     });
   } catch (err) {
     console.error("[auth] User upsert error:", err.message);

@@ -6,7 +6,8 @@ const userSchema = new mongoose.Schema(
     email: { type: String, required: true, unique: true },
     name: { type: String },
     picture: { type: String },
-    role: { type: String, enum: ["admin", "hr"], default: "admin" },
+    // Allow regular users for the wedding-budget flow
+    role: { type: String, enum: ["admin", "hr", "user"], default: "user" },
   },
   { timestamps: true },
 );

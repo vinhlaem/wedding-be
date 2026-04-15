@@ -5,7 +5,10 @@ const User = require("../models/User");
  * @param {{ googleId: string, email: string, name: string, picture: string }} profile
  * @returns {Promise<User>}
  */
-const findOrCreateUser = async ({ googleId, email, name, picture }) => {
+/**
+ * Find or create user. Accepts optional `role` to set when creating a new user.
+ */
+const findOrCreateUser = async ({ googleId, email, name, picture, role }) => {
   // Try to find by googleId first (primary key for OAuth accounts)
   let user = await User.findOne({ googleId });
 
@@ -25,7 +28,9 @@ const findOrCreateUser = async ({ googleId, email, name, picture }) => {
   }
 
   // Create fresh user
-  user = await User.create({ googleId, email, name, picture });
+  const createPayload = { googleId, email, name, picture };
+  if (role) createPayload.role = role;
+  user = await User.create(createPayload);
   return user;
 };
 
