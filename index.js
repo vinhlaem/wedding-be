@@ -13,7 +13,6 @@ const notificationRoutes = require("./routes/notification");
 const cronRoutes = require("./routes/cron");
 const adminRoutes = require("./routes/admin");
 const { startCron } = require("./services/cronService");
-const { seedBudgets } = require("./scripts/seedBudget");
 const cors = require("cors");
 const bodyParser = require("body-parser");
 const { lightQueue } = require("./middleware/requestQueue");
@@ -32,14 +31,10 @@ app.use(bodyParser.urlencoded({ extended: true, limit: "256kb" }));
 
 // ── DB connection singleton — await before handling any request ──────────────
 // This ensures the first cold-start request doesn't race with the connect.
-const dbReady = connectDB()
-  .then(async () => {
-    await seedBudgets();
-  })
-  .catch((err) => {
-    console.error("[startup] MongoDB connection failed:", err.message);
-    process.exit(1);
-  });
+const dbReady = connectDB().catch((err) => {
+  console.error("[startup] MongoDB connection failed:", err.message);
+  process.exit(1);
+});
 
 app.use(async (req, res, next) => {
   await dbReady;

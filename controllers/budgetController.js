@@ -137,6 +137,97 @@ const createBudget = async (req, res) => {
   }
 };
 
+const createBudgetsBulk = async (req, res) => {
+  try {
+    const { budgets } = req.body || {};
+
+    if (!Array.isArray(budgets) || budgets.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "budgets must be a non-empty array",
+      });
+    }
+
+    const ownerId = req.user && req.user.sub;
+
+    const validBudgets = [];
+    const errors = [];
+
+    budgets.forEach((item, index) => {
+      const {
+        category,
+        itemName,
+        estimatedCost,
+        depositPaid,
+        note,
+        status,
+        deadline,
+      } = item;
+
+      // validate category
+      if (!category || !VALID_CATEGORIES.includes(category)) {
+        errors.push({ index, message: "Invalid category" });
+        return;
+      }
+
+      // validate itemName
+      if (
+        !itemName ||
+        typeof itemName !== "string" ||
+        itemName.trim().length === 0
+      ) {
+        errors.push({ index, message: "itemName is required" });
+        return;
+      }
+
+      // validate estimatedCost
+      if (estimatedCost == null || Number(estimatedCost) < 0) {
+        errors.push({ index, message: "Invalid estimatedCost" });
+        return;
+      }
+
+      const estNum = Number(estimatedCost);
+      const depNum = depositPaid != null ? Number(depositPaid) : 0;
+
+      validBudgets.push({
+        category,
+        itemName: itemName.trim(),
+        estimatedCost: estNum,
+        baseEstimatedCost: estNum,
+        depositPaid: depNum,
+        remainingCost: estNum - depNum,
+        note: note || "",
+        status: status && VALID_STATUSES.includes(status) ? status : "chua-coc",
+        deadline: deadline ? new Date(deadline) : null,
+        vendors: [],
+        owner: ownerId,
+      });
+    });
+
+    if (validBudgets.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "All items are invalid",
+        errors,
+      });
+    }
+
+    // insert bulk
+    const createdBudgets = await Budget.insertMany(validBudgets);
+
+    return res.status(201).json({
+      success: true,
+      data: createdBudgets,
+      errors, // optional: trả về những item bị lỗi
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
 const updateBudget = async (req, res) => {
   try {
     const { id } = req.params;
@@ -565,6 +656,7 @@ const acceptShare = async (req, res) => {
 module.exports = {
   getBudgets,
   createBudget,
+  createBudgetsBulk,
   updateBudget,
   deleteBudget,
   addVendor,

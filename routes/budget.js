@@ -11,6 +11,7 @@ const {
   setDefaultVendor,
   createShareLink,
   acceptShare,
+  createBudgetsBulk,
 } = require("../controllers/budgetController");
 const { verifyJWT } = require("../middleware/authMiddleware");
 const { writeLimiter } = require("../middleware/rateLimiter");
@@ -21,6 +22,9 @@ router.get("/", verifyJWT, getBudgets);
 
 // POST /api/budgets
 router.post("/", verifyJWT, writeLimiter, createBudget);
+
+// POST /api/budgets/bulk  -> create multiple budgets at once (for admin use)
+router.post("/bulk", verifyJWT, writeLimiter, createBudgetsBulk);
 
 // PUT /api/budgets/:id
 router.put("/:id", verifyJWT, writeLimiter, updateBudget);
