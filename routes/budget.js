@@ -23,7 +23,6 @@ router.get("/", verifyJWT, getBudgets);
 // POST /api/budgets
 router.post("/", verifyJWT, writeLimiter, createBudget);
 
-// POST /api/budgets/bulk  -> create multiple budgets at once (for admin use)
 router.post("/bulk", verifyJWT, writeLimiter, createBudgetsBulk);
 
 // PUT /api/budgets/:id
