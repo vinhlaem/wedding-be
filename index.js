@@ -12,6 +12,7 @@ const pushRoutes = require("./routes/push");
 const notificationRoutes = require("./routes/notification");
 const cronRoutes = require("./routes/cron");
 const adminRoutes = require("./routes/admin");
+const slidesRoutes = require("./routes/slides");
 const { startCron } = require("./services/cronService");
 const cors = require("cors");
 const bodyParser = require("body-parser");
@@ -69,6 +70,9 @@ app.use("/api/cron", cronRoutes);
 
 // One-time admin tasks — protected by ADMIN_SECRET (remove after use)
 app.use("/api/admin", adminRoutes);
+
+// Slides (CMS-managed slideshow)
+app.use("/api/slides", apiLimiter, slidesRoutes);
 
 // ── Start cron jobs after DB is ready ─────────────────────────────────────────
 dbReady.then(() => startCron());
