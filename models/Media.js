@@ -12,6 +12,7 @@ const mediaSchema = new mongoose.Schema(
         "timeline",
         "profile",
         "quote",
+        "slide",
         "footer",
       ],
       required: true,
