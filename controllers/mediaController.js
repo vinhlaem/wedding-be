@@ -18,6 +18,10 @@ const MEDIA_PROJECTION = {
 };
 
 // ─── GET /api/media?component=banner&role=wife ───────────────────────────────────────────────────────
+// Notes:
+// - Query params: `component`, `role`.
+// - If `component=gallery`, an optional `limit` query param is supported to
+//   cap the number of returned items (default: 50). Example: `/api/media?component=gallery&limit=20`
 const getMedia = async (req, res) => {
   try {
     const { component, role } = req.query;
@@ -25,10 +29,21 @@ const getMedia = async (req, res) => {
     if (component) filter.component = component;
     if (role) filter.role = role;
 
+    // Build the query. For galleries, apply a limit to avoid returning very
+    // large result sets by default.
+    let query = Media.find(filter, MEDIA_PROJECTION).sort({
+      order: 1,
+      createdAt: -1,
+    });
+
+    if (component === "gallery") {
+      const parsed = Number(req.query.limit);
+      const limit = Number.isFinite(parsed) && parsed > 0 ? parsed : 50;
+      query = query.limit(limit);
+    }
+
     // lean() returns plain JS objects (no Mongoose overhead) — faster + less RAM.
-    const media = await Media.find(filter, MEDIA_PROJECTION)
-      .sort({ order: 1, createdAt: -1 })
-      .lean();
+    const media = await query.lean();
 
     // Public media is immutable until an admin changes it.
     // Cache at CDN/browser for 60 s, serve stale for up to 5 min while revalidating.
