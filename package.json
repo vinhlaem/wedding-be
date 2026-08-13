@@ -7,7 +7,9 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "nodemon index.js",
     "dev": "nodemon index.js",
-    "db:indexes": "node scripts/createIndexes.js"
+    "db:indexes": "node scripts/createIndexes.js",
+    "seed:reunion": "node scripts/seedClassMembers.js",
+    "migrate:reunion": "node scripts/migrateReunion.js"
   },
   "author": "",
   "license": "ISC",

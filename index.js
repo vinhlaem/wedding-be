@@ -13,7 +13,9 @@ const notificationRoutes = require("./routes/notification");
 const cronRoutes = require("./routes/cron");
 const adminRoutes = require("./routes/admin");
 const slidesRoutes = require("./routes/slides");
+const reunionRoutes = require("./routes/reunion");
 const { startCron } = require("./services/cronService");
+const { ensureReunionDatabase } = require("./services/reunionBootstrapService");
 const cors = require("cors");
 const bodyParser = require("body-parser");
 const { lightQueue } = require("./middleware/requestQueue");
@@ -21,7 +23,16 @@ const { apiLimiter, writeLimiter } = require("./middleware/rateLimiter");
 
 app.use(
   cors({
-    origin: "*",
+    origin(origin, callback) {
+      const allowed = (process.env.CORS_ORIGINS || process.env.CORS_ORIGIN || "")
+        .split(",")
+        .map((value) => value.trim().replace(/\/$/, ""))
+        .filter(Boolean);
+      if (!origin || allowed.length === 0 || allowed.includes(origin.replace(/\/$/, ""))) {
+        return callback(null, true);
+      }
+      return callback(new Error("Origin is not allowed by CORS"));
+    },
     credentials: true,
   }),
 );
@@ -34,12 +45,21 @@ app.use(bodyParser.urlencoded({ extended: true, limit: "256kb" }));
 // This ensures the first cold-start request doesn't race with the connect.
 const dbReady = connectDB().catch((err) => {
   console.error("[startup] MongoDB connection failed:", err.message);
-  process.exit(1);
+  throw err;
 });
 
+// Vercel has no post-deploy migration shell. Ensure reunion indexes and
+// idempotent master data on every cold-start before serving any API request.
+const appReady = dbReady.then(() => ensureReunionDatabase());
+
 app.use(async (req, res, next) => {
-  await dbReady;
-  next();
+  try {
+    await appReady;
+    next();
+  } catch (error) {
+    console.error("[startup] Database bootstrap failed:", error.message);
+    res.status(503).json({ success: false, message: "Database initialization failed" });
+  }
 });
 
 // ── Routes ────────────────────────────────────────────────────────────────────
@@ -73,6 +93,9 @@ app.use("/api/admin", adminRoutes);
 
 // Slides (CMS-managed slideshow)
 app.use("/api/slides", apiLimiter, slidesRoutes);
+
+// Class reunion 2026 (isolated public registration + PIN-protected admin APIs)
+app.use("/api/reunion", apiLimiter, reunionRoutes);
 
 // ── Start cron jobs after DB is ready ─────────────────────────────────────────
 dbReady.then(() => startCron());
