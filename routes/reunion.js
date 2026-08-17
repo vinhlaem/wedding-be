@@ -21,6 +21,12 @@ router.post(
   writeLimiter,
   planController.toggleVote,
 );
+router.delete(
+  "/plans/:id",
+  verifyReunionMember,
+  writeLimiter,
+  planController.deletePlan,
+);
 router.post("/admin/login", writeLimiter, controller.adminLogin);
 router.post("/admin/logout", controller.adminLogout);
 router.get("/admin/status", controller.adminStatus);

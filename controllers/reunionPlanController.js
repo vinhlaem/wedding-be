@@ -25,7 +25,12 @@ const ensureInitialPlan = () =>
     { upsert: true, new: true },
   );
 
-const serializePlan = (plan, voteCount, currentMemberVotes) => ({
+const serializePlan = (
+  plan,
+  voteCount,
+  currentMemberVotes,
+  voterNames = [],
+) => ({
   id: plan._id,
   title: plan.title,
   description: plan.description,
@@ -37,6 +42,7 @@ const serializePlan = (plan, voteCount, currentMemberVotes) => ({
   authorId: plan.authorId?._id || null,
   authorName: plan.authorId?.fullName || "Ban tổ chức",
   voteCount,
+  voterNames,
   hasVoted: currentMemberVotes.has(plan._id.toString()),
   createdAt: plan.createdAt,
 });
@@ -62,7 +68,7 @@ const listPlans = async (req, res) => {
   try {
     await ensureInitialPlan();
     const memberId = getOptionalMemberId(req);
-    const [plans, voteCounts, memberVotes] = await Promise.all([
+    const [plans, voteCounts, memberVotes, ballots] = await Promise.all([
       ReunionPlan.find().populate("authorId").lean(),
       ReunionPlanVote.aggregate([
         { $unwind: "$planIds" },
@@ -71,6 +77,9 @@ const listPlans = async (req, res) => {
       memberId
         ? ReunionPlanVote.findOne({ memberId }).select("planIds").lean()
         : null,
+      ReunionPlanVote.find({ "planIds.0": { $exists: true } })
+        .populate("memberId", "fullName")
+        .lean(),
     ]);
 
     const counts = new Map(
@@ -79,12 +88,23 @@ const listPlans = async (req, res) => {
     const currentMemberVotes = new Set(
       (memberVotes?.planIds || []).map((planId) => planId.toString()),
     );
+    const voterNamesByPlan = new Map();
+    for (const ballot of ballots) {
+      if (!ballot.memberId?.fullName) continue;
+      for (const planId of ballot.planIds) {
+        const key = planId.toString();
+        const names = voterNamesByPlan.get(key) || [];
+        names.push(ballot.memberId.fullName);
+        voterNamesByPlan.set(key, names);
+      }
+    }
     const data = plans
       .map((plan) =>
         serializePlan(
           plan,
           counts.get(plan._id.toString()) || 0,
           currentMemberVotes,
+          voterNamesByPlan.get(plan._id.toString()) || [],
         ),
       )
       .sort(
@@ -259,4 +279,56 @@ const toggleVote = async (req, res) => {
   }
 };
 
-module.exports = { createPlan, listPlans, toggleVote };
+const deletePlan = async (req, res) => {
+  try {
+    const memberId = req.reunionMember.memberId;
+    const planId = req.params.id;
+
+    if (!mongoose.isValidObjectId(planId)) {
+      return res.status(404).json({
+        success: false,
+        message: "Không tìm thấy plan.",
+      });
+    }
+
+    const plan = await ReunionPlan.findOne({
+      _id: planId,
+      authorId: memberId,
+      isSeed: false,
+    });
+    if (!plan) {
+      return res.status(403).json({
+        success: false,
+        message: "Bạn chỉ có thể xóa plan do chính mình tạo.",
+      });
+    }
+
+    const hasOtherVotes = await ReunionPlanVote.exists({
+      memberId: { $ne: memberId },
+      planIds: plan._id,
+    });
+    if (hasOtherVotes) {
+      return res.status(409).json({
+        success: false,
+        code: "PLAN_HAS_OTHER_VOTES",
+        message: "Không thể xóa vì plan đã có thành viên khác bình chọn.",
+      });
+    }
+
+    await ReunionPlan.deleteOne({ _id: plan._id, authorId: memberId });
+    await ReunionPlanVote.updateMany(
+      { planIds: plan._id },
+      { $pull: { planIds: plan._id } },
+    );
+
+    return res.json({ success: true });
+  } catch (error) {
+    console.error("[reunion] delete plan:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Không thể xóa plan lúc này. Vui lòng thử lại.",
+    });
+  }
+};
+
+module.exports = { createPlan, deletePlan, listPlans, toggleVote };
