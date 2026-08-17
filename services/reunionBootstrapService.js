@@ -1,5 +1,7 @@
 const ClassMember = require("../models/ClassMember");
 const Registration = require("../models/Registration");
+const ReunionPlan = require("../models/ReunionPlan");
+const ReunionPlanVote = require("../models/ReunionPlanVote");
 const classMemberNames = require("../data/classMembers");
 const { normalizeFacebookName } = require("../utils/normalizeFacebookName");
 
@@ -18,6 +20,8 @@ const ensureReunionDatabase = () => {
   bootstrapPromise = (async () => {
     await ClassMember.createIndexes();
     await Registration.createIndexes();
+    await ReunionPlan.createIndexes();
+    await ReunionPlanVote.createIndexes();
 
     const operations = classMemberNames.map((fullName, index) => ({
       updateOne: {
@@ -35,7 +39,9 @@ const ensureReunionDatabase = () => {
     }));
 
     await ClassMember.bulkWrite(operations, { ordered: false });
-    console.log(`[reunion] Database ready; ${classMemberNames.length} members ensured.`);
+    console.log(
+      `[reunion] Database ready; ${classMemberNames.length} members ensured.`,
+    );
   })().catch((error) => {
     // Allow a later invocation in the same warm instance to retry.
     bootstrapPromise = null;
