@@ -2,6 +2,7 @@ const axios = require("axios");
 
 const DA_NANG = { latitude: 16.0544, longitude: 108.2022 };
 const MAX_DISTANCE_KM = 150;
+const NOMINATIM_URL = "https://nominatim.openstreetmap.org/search";
 
 const toRadians = (degrees) => (degrees * Math.PI) / 180;
 
@@ -44,27 +45,41 @@ const getDrivingDistance = async (latitude, longitude) => {
   return distanceMeters / 1000;
 };
 
-const geocodeLocation = async (location) => {
-  const response = await axios.get(
-    "https://nominatim.openstreetmap.org/search",
-    {
-      params: {
-        q: `${location}, Việt Nam`,
-        format: "jsonv2",
-        addressdetails: 1,
-        countrycodes: "vn",
-        limit: 1,
-      },
-      headers: {
-        "User-Agent":
-          process.env.GEOCODING_USER_AGENT ||
-          "ABC1-Reunion/1.0 (reunion location validation)",
-      },
-      timeout: 8000,
+const searchLocation = async (query) => {
+  const response = await axios.get(NOMINATIM_URL, {
+    params: {
+      q: query,
+      format: "jsonv2",
+      addressdetails: 1,
+      countrycodes: "vn",
+      limit: 1,
     },
-  );
+    headers: {
+      "User-Agent":
+        process.env.GEOCODING_USER_AGENT ||
+        "ABC1-Reunion/1.0 (reunion location validation)",
+    },
+    timeout: 8000,
+  });
 
-  const match = response.data?.[0];
+  return response.data?.[0] || null;
+};
+
+const geocodeLocation = async (location) => {
+  let match = await searchLocation(`${location}, Việt Nam`);
+
+  if (!match) {
+    const administrativeArea = location
+      .split(",")
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .at(-1);
+
+    if (administrativeArea) {
+      match = await searchLocation(`${administrativeArea}, Đà Nẵng, Việt Nam`);
+    }
+  }
+
   if (!match) {
     const error = new Error("LOCATION_NOT_FOUND");
     error.code = "LOCATION_NOT_FOUND";
@@ -101,4 +116,5 @@ module.exports = {
   distanceFromDaNang,
   getDrivingDistance,
   geocodeLocation,
+  searchLocation,
 };
