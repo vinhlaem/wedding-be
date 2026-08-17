@@ -3,10 +3,7 @@ const ClassMember = require("../models/ClassMember");
 const Registration = require("../models/Registration");
 const ReunionPlan = require("../models/ReunionPlan");
 const ReunionPlanVote = require("../models/ReunionPlanVote");
-const {
-  MAX_DISTANCE_KM,
-  geocodeLocation,
-} = require("../services/reunionGeocodingService");
+const MAX_DISTANCE_KM = 150;
 
 const ensureInitialPlan = () =>
   ReunionPlan.findOneAndUpdate(
@@ -157,41 +154,10 @@ const createPlan = async (req, res) => {
       });
     }
 
-    let geocoded;
-    try {
-      geocoded = await geocodeLocation(location);
-    } catch (error) {
-      if (error.code === "LOCATION_NOT_FOUND") {
-        return res.status(400).json({
-          success: false,
-          code: "LOCATION_NOT_FOUND",
-          message:
-            "Không xác định được địa điểm. Vui lòng nhập tên cụ thể hơn, ví dụ: Lăng Cô, Huế.",
-        });
-      }
-      throw error;
-    }
-
-    if (!geocoded.isWithinRange) {
-      return res.status(400).json({
-        success: false,
-        code: "LOCATION_OUT_OF_RANGE",
-        message: `Địa điểm cách Đà Nẵng khoảng ${geocoded.distanceKm} km, vượt quá bán kính ${MAX_DISTANCE_KM} km.`,
-        data: {
-          resolvedAddress: geocoded.resolvedAddress,
-          distanceKm: geocoded.distanceKm,
-        },
-      });
-    }
-
     const plan = await ReunionPlan.create({
       title,
       description,
       location,
-      resolvedAddress: geocoded.resolvedAddress,
-      latitude: geocoded.latitude,
-      longitude: geocoded.longitude,
-      distanceKm: geocoded.distanceKm,
       authorId: memberId,
     });
     await plan.populate("authorId");
@@ -211,7 +177,7 @@ const createPlan = async (req, res) => {
     console.error("[reunion] create plan:", error);
     return res.status(500).json({
       success: false,
-      message: "Không thể xác thực địa điểm lúc này. Vui lòng thử lại.",
+      message: "Không thể tạo plan lúc này. Vui lòng thử lại.",
     });
   }
 };
